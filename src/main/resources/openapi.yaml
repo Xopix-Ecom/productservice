@@ -1,0 +1,388 @@
+openapi: 3.0.0
+info:
+  title: Xopix Product Service API
+  version: 1.0.0
+  description: API for managing product catalog within Xopix E-commerce.
+servers:
+  - url: http://localhost:8081/api/products # Base URL for the Product Service
+    description: Local development server
+  - url: https://api.xopix.com/products # Example production URL (via API Gateway)
+    description: Production API Gateway endpoint for Product Service
+
+tags:
+  - name: Products
+    description: Product catalog management operations
+
+paths:
+  /products:
+    get:
+      summary: Get all products
+      operationId: getAllProducts
+      tags:
+        - Products
+      parameters:
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+        - name: sortBy
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            default: name
+        - name: sortDir
+          in: query
+          description: Sort direction (asc or desc)
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: List of products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a new product
+      operationId: createProduct
+      tags:
+        - Products
+      security:
+        - BearerAuth: [] # Requires Admin role authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreationRequest'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Invalid request payload or product SKU/name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions (e.g., not an Admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/{productId}:
+    get:
+      summary: Get product by ID
+      operationId: getProductById
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: ID of the product to retrieve
+          schema:
+            type: string
+            format: uuid # Assuming UUID for product IDs internally
+      responses:
+        '200':
+          description: Product retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update product details by ID
+      operationId: updateProduct
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: ID of the product to update
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: [] # Requires Admin role authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdateRequest'
+      responses:
+        '200':
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete a product by ID
+      operationId: deleteProduct
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: ID of the product to delete
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: [] # Requires Admin role authentication
+      responses:
+        '204':
+          description: Product deleted successfully
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ProductCreationRequest:
+      type: object
+      required:
+        - name
+        - description
+        - price
+        - sku # Stock Keeping Unit, unique identifier
+        - category
+        - stockQuantity # Initial stock
+      properties:
+        name:
+          type: string
+          description: Name of the product
+          example: Xopix Wireless Earbuds
+        description:
+          type: string
+          description: Detailed description of the product
+          example: High-fidelity wireless earbuds with noise cancellation.
+        price:
+          type: number
+          format: float
+          description: Price of the product
+          example: 99.99
+        sku:
+          type: string
+          description: Unique Stock Keeping Unit
+          example: XW-ER-001
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        imageUrl:
+          type: string
+          format: url
+          description: URL to the product image
+          example: https://images.xopix.com/earbuds.jpg
+        stockQuantity:
+          type: integer
+          format: int32
+          description: Initial quantity in stock
+          example: 100
+        # Add other relevant fields like brand, specifications, etc.
+
+    ProductUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Updated name of the product
+          example: Xopix Wireless Earbuds Pro
+        description:
+          type: string
+          description: Updated detailed description
+          example: High-fidelity wireless earbuds with active noise cancellation and longer battery life.
+        price:
+          type: number
+          format: float
+          description: Updated price
+          example: 129.99
+        category:
+          type: string
+          description: Updated product category
+          example: Audio
+        imageUrl:
+          type: string
+          format: url
+          description: Updated URL to the product image
+          example: https://images.xopix.com/earbuds-pro.jpg
+        # Note: stockQuantity updates should typically go via Inventory Service,
+        # but for simplicity, we might allow it here for initial setup.
+        # stockQuantity:
+        #   type: integer
+        #   format: int32
+        #   description: Updated quantity in stock
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the product
+          example: "p1a2b3c4-d5e6-7890-1234-567890abcdef"
+        name:
+          type: string
+          example: Xopix Wireless Earbuds
+        description:
+          type: string
+          example: High-fidelity wireless earbuds with noise cancellation.
+        price:
+          type: number
+          format: float
+          example: 99.99
+        sku:
+          type: string
+          example: XW-ER-001
+        category:
+          type: string
+          example: Electronics
+        imageUrl:
+          type: string
+          format: url
+          example: https://images.xopix.com/earbuds.jpg
+        stockQuantity: # This will be managed by Inventory Service in later phases
+          type: integer
+          format: int32
+          example: 95
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the product was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the product was last updated
+
+    ErrorResponse: # Reusing ErrorResponse schema from User Service for consistency
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2023-10-27T10:00:00.000Z"
+        status:
+          type: integer
+          example: 404
+        error:
+          type: string
+          example: Not Found
+        message:
+          type: string
+          example: Product with ID p1a2b3c4-d5e6-7890-1234-567890abcdef not found.
+        path:
+          type: string
+          example: /api/products/p1a2b3c4-d5e6-7890-1234-567890abcdef
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: """JWT Authorization header with Bearer scheme. Example: "Authorization: Bearer {token}"
